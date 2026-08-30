@@ -1565,6 +1565,381 @@ function exportGIF(){
 }
 
 /* ============================================================
+   MODE — MARKS Point marks
+
+   The merged point-mark engine (UNIFICATION.md, phase 1). It is
+   cream's own mode contract sliced one seam finer, the way
+   letter-shape-generator already slices it:
+
+     pool          what a mark IS      — colour, size, alpha, phase,
+                                         glyph. Seeded. Knows nothing
+                                         about where it will go.
+     sample(dist)  where it GOES       — grid / rings / orbit / glyph.
+                                         Four samplers over the same pool.
+     place(t)      per frame           — warp, tremble, breathe. Advances
+                                         phase; never re-randomises layout.
+     draw(shape)   what is painted     — dot / arc / sphere / brick /
+                                         ascii / ring. An axis of its own.
+
+   Separating pool from sample is the whole point: it makes the mark
+   independent of its position, so two samplers can be run over one pool
+   and the result lerped. That is `morph`, and it is what neither
+   cream nor letter-shape can express today — ARCS cannot become type,
+   a dot grid cannot reform into a word.
+
+   DOTS, ARCS and ORBS are all expressible here (grid/dot, rings/arc,
+   orbit/sphere) and are meant to be retired into it once this mode has
+   proven it covers them. FIELD, FLOW, AURA and SLICE are NOT: they
+   return polylines and raster, not marks, and keep their own primitive.
+   ============================================================ */
+
+var ASCII_POOL = ["/","\\","+","x","·","|","-","*"];
+
+/* Glyph mask, cached by text and artboard size. Sampled in build(), which
+   runs under the structural seed, so the same seed gives the same word in
+   the same places. */
+var maskCv = null, maskKey = "", maskPts = null;
+function glyphPoints(S, text){
+  var key = text + "|" + S.cw + "|" + S.ch;
+  if(key === maskKey) return maskPts;
+  var W = 220, H = Math.max(40, Math.round(W * S.ch / S.cw));
+  if(!maskCv){ maskCv = document.createElement("canvas"); }
+  maskCv.width = W; maskCv.height = H;
+  var m = maskCv.getContext("2d");
+  m.fillStyle = "#000"; m.fillRect(0, 0, W, H);
+  m.fillStyle = "#fff";
+  m.textAlign = "center"; m.textBaseline = "middle";
+  var px = H * 0.72;
+  if(text.length > 1){
+    m.font = "800 100px -apple-system, system-ui, sans-serif";
+    var w100 = m.measureText(text).width || 1;
+    px = Math.min(px, (W * 0.86) / (w100 / 100));
+  }
+  m.font = "800 " + px + "px -apple-system, system-ui, sans-serif";
+  m.fillText(text, W / 2, H / 2);
+  var d = m.getImageData(0, 0, W, H).data, pts = [];
+  for(var y = 0; y < H; y++){
+    for(var x = 0; x < W; x++){
+      if(d[(y * W + x) * 4] > 120) pts.push(x / W, y / H);
+    }
+  }
+  maskKey = key; maskPts = pts;
+  return pts;
+}
+
+/* Every sampler returns artboard-space {x, y, band}. `band` is the
+   layer index that feeds S.speedDiff, so marks at different depths
+   drift against each other exactly as they do in ARCS and ORBS. */
+function sampleMarks(dist, S, p, pool){
+  var n = pool.length, out = new Array(n);
+  var cx = S.cw / 2, cy = S.ch / 2;
+  var iw = S.cw - S.pad * 2, ih = S.ch - S.pad * 2;
+  var maxD = Math.sqrt(iw * iw + ih * ih) / 2 || 1;
+  var i, o, a, R;
+
+  if(dist === "grid"){
+    var cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * (iw / ih) * p.gridAspect))));
+    var rows = Math.max(1, Math.ceil(n / cols));
+    var gx = cols > 1 ? iw / (cols - 1) : 0;
+    var gy = rows > 1 ? ih / (rows - 1) : 0;
+    for(i = 0; i < n; i++){
+      o = pool[i];
+      var col = i % cols, row = Math.floor(i / cols);
+      var x = S.pad + col * gx + (row % 2 ? p.stagger * gx * 0.5 : 0);
+      var y = S.pad + row * gy;
+      x += (o.jx * 2 - 1) * p.jitter;
+      y += (o.jy * 2 - 1) * p.jitter;
+      var nd = Math.min(1, Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxD);
+      out[i] = { x: x, y: y, band: Math.min(5, Math.floor(nd * 6)) };
+    }
+    return out;
+  }
+
+  if(dist === "rings" || dist === "orbit"){
+    var ringN = Math.max(1, p.rings | 0);
+    var per = Math.max(1, Math.ceil(n / ringN));
+    var squash = dist === "orbit" ? Math.cos(p.tilt * Math.PI / 180) : 1;
+    var jitA = dist === "rings" ? p.aJit * Math.PI / 180 : 0;
+    for(i = 0; i < n; i++){
+      o = pool[i];
+      var ring = Math.floor(i / per), slot = i % per;
+      R = p.r0 + ring * p.step;
+      a = slot * TAU / per + ring * p.phase * TAU + (o.ja * 2 - 1) * jitA;
+      out[i] = {
+        x: cx + R * Math.cos(a) + (o.jx * 2 - 1) * p.jitter,
+        y: cy + R * Math.sin(a) * squash + (o.jy * 2 - 1) * p.jitter,
+        band: Math.min(5, ring)
+      };
+    }
+    return out;
+  }
+
+  /* glyph — letter-shape's assignTargets, as one sampler among peers */
+  var mp = glyphPoints(S, p.text || "A");
+  var np = mp.length / 2;
+  for(i = 0; i < n; i++){
+    o = pool[i];
+    if(!np){ out[i] = { x: cx, y: cy, band: 0 }; continue; }
+    var k = Math.floor(o.jm * np) % np;
+    out[i] = {
+      x: mp[k * 2] * S.cw + (o.jx * 2 - 1) * p.feather,
+      y: mp[k * 2 + 1] * S.ch + (o.jy * 2 - 1) * p.feather,
+      band: Math.min(5, Math.floor(o.jm * 6))
+    };
+  }
+  return out;
+}
+
+MODES.marks = {
+  label: "MARKS", cn: "Point marks", unit: "MARKS",
+  defaults: {
+    dist: "grid", shape: "dot",
+    n: 900, size: 9, sizeRand: 0.35, alpha: 1, alphaRand: 0.2,
+    falloff: 0.35, jitter: 0,
+    gridAspect: 1, stagger: 0,
+    rings: 8, r0: 90, step: 42, aJit: 30,
+    tilt: 62, phase: 0.12,
+    text: "CREAM", feather: 6,
+    morphTo: "none", morph: 0,
+    sweep: 26, lw: 6,
+    warp: "none", warpAmt: 20, warpFreq: 1.3, tremble: 0
+  },
+  groups: [
+    { name:"Marks", params:[
+      { k:"dist", type:"seg", label:"Distribution", struct:true, pri:true,
+        opts:[["grid","Grid"],["rings","Rings"],["orbit","Orbit"],["glyph","Glyph"]] },
+      { k:"shape", type:"seg", label:"Mark shape", pri:true,
+        opts:[["dot","Dot"],["arc","Arc"],["sphere","Sphere"],["brick","Brick"],["ascii","ASCII"],["ring","Ring"]] },
+      { k:"n", label:"Count", min:40, max:3600, step:20, struct:true, pri:true },
+      { k:"size", label:"Mark size", min:0.5, max:40, step:0.5, struct:true, suffix:"px", pri:true },
+      { k:"sizeRand", label:"Size jitter", min:0, max:1, step:0.01, struct:true },
+      { k:"falloff", label:"Centre falloff", min:-1, max:1, step:0.01 },
+      { k:"alpha", label:"Opacity", min:0, max:1, step:0.01, struct:true },
+      { k:"alphaRand", label:"Opacity jitter", min:0, max:1, step:0.01, struct:true },
+      { k:"jitter", label:"Position jitter", min:0, max:60, step:0.5, struct:true, suffix:"px" }
+    ]},
+    { name:"Morph", params:[
+      { k:"morphTo", type:"seg", label:"Morph toward", struct:true,
+        opts:[["none","Off"],["grid","Grid"],["rings","Rings"],["orbit","Orbit"],["glyph","Glyph"]] },
+      { k:"morph", label:"Morph amount", min:0, max:1, step:0.01, pri:true }
+    ]},
+    { name:"Grid", params:[
+      { k:"gridAspect", label:"Cell aspect", min:0.15, max:6, step:0.05, struct:true },
+      { k:"stagger", label:"Stagger", min:0, max:1, step:0.01, struct:true }
+    ]},
+    { name:"Rings and orbit", params:[
+      { k:"rings", label:"Rings", min:1, max:34, step:1, struct:true },
+      { k:"r0", label:"Start radius", min:0, max:420, step:2, struct:true, suffix:"px" },
+      { k:"step", label:"Radius step", min:2, max:96, step:1, struct:true, suffix:"px" },
+      { k:"aJit", label:"Angle jitter", min:0, max:90, step:1, struct:true, suffix:"°" },
+      { k:"tilt", label:"Orbit tilt", min:0, max:88, step:1, struct:true, suffix:"°" },
+      { k:"phase", label:"Ring phase", min:0, max:1, step:0.01, struct:true }
+    ]},
+    { name:"Glyph", params:[
+      { type:"custom", render:function(host){
+          var box = el("div","ctl");
+          var lab = el("div","lab");
+          lab.appendChild(el("span",null,"Text"));
+          box.appendChild(lab);
+          var inp = document.createElement("input");
+          inp.className = "tin";
+          inp.type = "text"; inp.maxLength = 24; inp.value = P().text;
+          inp.setAttribute("aria-label","Glyph text");
+          inp.addEventListener("input", function(){
+            P().text = inp.value || " ";
+            invalidate(); redraw(); updateLabels();
+          });
+          box.appendChild(inp);
+          box.appendChild(el("div","hint","Any text. Marks fill the letterforms; morph carries them in and out."));
+          host.appendChild(box);
+        }},
+      { k:"feather", label:"Edge feather", min:0, max:40, step:0.5, struct:true, suffix:"px" }
+    ]},
+    { name:"Shape", params:[
+      { k:"sweep", label:"Arc sweep", min:2, max:180, step:1, suffix:"°" },
+      { k:"lw", label:"Stroke width", min:0.4, max:30, step:0.2, suffix:"px" }
+    ]},
+    { name:"Warp", params:[
+      { k:"warp", type:"seg", label:"Warp", opts:[["none","None"],["sine","Sine"],["radial","Radial"]] },
+      { k:"warpAmt", label:"Warp amount", min:0, max:90, step:1, suffix:"px" },
+      { k:"warpFreq", label:"Warp frequency", min:0.2, max:6, step:0.05 },
+      { k:"tremble", label:"Tremble", min:0, max:40, step:0.5, suffix:"px" }
+    ]}
+  ],
+  looks: [
+    { name:"Halftone", s:{ dist:"grid", shape:"dot", n:1600, size:7, sizeRand:0.08, falloff:0.85,
+                           jitter:0, alpha:1, alphaRand:0, warp:"radial", warpAmt:30, warpFreq:2.4, morphTo:"none" } },
+    { name:"Ring set", s:{ dist:"rings", shape:"arc", n:60, rings:9, r0:60, step:38, aJit:40,
+                           lw:7, sweep:24, falloff:0, alpha:1, alphaRand:0.1, warp:"none", morphTo:"none" } },
+    { name:"Orrery",   s:{ dist:"orbit", shape:"sphere", n:220, rings:6, r0:110, step:52, tilt:66,
+                           phase:0.12, size:11, sizeRand:0.4, falloff:0, warp:"none", morphTo:"none" } },
+    { name:"Type",     s:{ dist:"glyph", shape:"dot", n:2600, size:5, sizeRand:0.4, feather:7,
+                           falloff:0, alpha:1, alphaRand:0.25, tremble:3, warp:"none", morphTo:"none" } },
+    { name:"Reform",   s:{ dist:"grid", shape:"dot", n:2000, size:6, sizeRand:0.3, falloff:0,
+                           gridAspect:1.6, morphTo:"glyph", morph:0.62, text:"CREAM", tremble:2, warp:"none" } },
+    { name:"Terminal", s:{ dist:"glyph", shape:"ascii", n:800, size:13, sizeRand:0.2, feather:4,
+                           falloff:0, alpha:1, alphaRand:0.2, warp:"none", morphTo:"none" } }
+  ],
+  defaultLook: 0,
+  count: function(S, p, L){ return L ? L.pool.length : 0; },
+
+  /* stage 1 + 2 — pool, then one sample per distribution in play */
+  build: function(S, p){
+    var pool = [], n = Math.max(1, p.n | 0);
+    for(var i = 0; i < n; i++){
+      pool.push({
+        c: pickColor(),
+        sz: Math.max(0.15, p.size * (1 + (rand() * 2 - 1) * p.sizeRand)),
+        a: Math.max(0, Math.min(1, p.alpha * (1 - rand() * p.alphaRand))),
+        ph: rand() * TAU,
+        tf: 0.5 + rand() * 1.3,
+        g: ASCII_POOL[Math.floor(rand() * ASCII_POOL.length)],
+        jx: rand(), jy: rand(), ja: rand(), jm: rand()
+      });
+    }
+    var A = sampleMarks(p.dist, S, p, pool);
+    var B = (p.morphTo !== "none" && p.morphTo !== p.dist)
+      ? sampleMarks(p.morphTo, S, p, pool) : null;
+    var iw = S.cw - S.pad * 2, ih = S.ch - S.pad * 2;
+    return {
+      pool: pool, A: A, B: B,
+      cx: S.cw / 2, cy: S.ch / 2,
+      maxD: Math.sqrt(iw * iw + ih * ih) / 2 || 1
+    };
+  },
+
+  /* stage 3 — advances phase and lerps between samplers; never re-randomises */
+  place: function(S, p, L, t, i){
+    var o = L.pool[i], a = L.A[i], b = L.B;
+    var x = a.x, y = a.y, band = a.band;
+    if(b){
+      var q = b[i], k = p.morph;
+      x = a.x + (q.x - a.x) * k;
+      y = a.y + (q.y - a.y) * k;
+      band = k < 0.5 ? a.band : q.band;
+    }
+    var ph = t * S.dir * (1 + band * S.speedDiff);
+    if(p.warp === "sine"){
+      x += Math.sin(y * p.warpFreq / 160 + ph) * p.warpAmt;
+      y += Math.cos(x * p.warpFreq / 160 + ph * 0.8) * p.warpAmt * 0.6;
+    } else if(p.warp === "radial"){
+      var dx0 = x - L.cx, dy0 = y - L.cy, d0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
+      var nd0 = Math.min(1, d0 / L.maxD);
+      var kk = Math.sin(nd0 * p.warpFreq * TAU - ph * 1.2) * p.warpAmt;
+      x += dx0 / d0 * kk; y += dy0 / d0 * kk;
+    }
+    if(p.tremble){
+      x += Math.sin(t * o.tf * 2 + o.ph) * p.tremble;
+      y += Math.cos(t * o.tf * 1.7 + o.ph * 1.3) * p.tremble;
+    }
+    x += jit(); y += jit();
+    var dx = x - L.cx, dy = y - L.cy;
+    var nd = Math.min(1, Math.sqrt(dx * dx + dy * dy) / L.maxD);
+    var scale = p.falloff >= 0 ? (1 - p.falloff * nd) : (1 + p.falloff * (nd - 1));
+    return {
+      x: x, y: y,
+      r: Math.max(0.15, o.sz * scale * bre(S, t, o.ph, 1.6)),
+      R: Math.sqrt(dx * dx + dy * dy), ang: Math.atan2(dy, dx)
+    };
+  },
+
+  /* stage 4 — the mark shape is its own axis, so any distribution can be
+     drawn as any of these. A grid of arcs and a word made of spheres are
+     both reachable; neither source tool could say them. */
+  draw: function(ctx, S, p, L, t){
+    resetAlpha();
+    var sweep = p.sweep * Math.PI / 180, lastAsciiPx = -1;
+    if(p.shape === "ascii"){
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    }
+    if(p.shape === "arc" || p.shape === "ring"){ ctx.lineCap = "round"; }
+    for(var i = 0; i < L.pool.length; i++){
+      var o = L.pool[i], q = MODES.marks.place(S, p, L, t, i);
+      setAlpha(o.a);
+      if(p.shape === "dot"){
+        ctx.fillStyle = paintOf(o.c, q.x, q.y, q.r);
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.fill();
+      } else if(p.shape === "sphere"){
+        var g = ctx.createRadialGradient(
+          q.x - q.r * 0.36, q.y - q.r * 0.36, Math.max(0.01, q.r * 0.08),
+          q.x, q.y, Math.max(0.02, q.r));
+        g.addColorStop(0, shade(o.c.c1, 0.34));
+        g.addColorStop(0.55, o.c.c1);
+        g.addColorStop(1, shade(o.c.c1, -0.42));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.fill();
+      } else if(p.shape === "arc"){
+        ctx.strokeStyle = strokeOf(o.c, L.cx, L.cy, Math.max(1, q.R));
+        ctx.lineWidth = Math.max(0.2, p.lw * (q.r / Math.max(0.15, o.sz)));
+        ctx.beginPath();
+        ctx.arc(L.cx, L.cy, Math.max(0.5, q.R), q.ang - sweep / 2, q.ang + sweep / 2);
+        ctx.stroke();
+      } else if(p.shape === "ring"){
+        ctx.strokeStyle = strokeOf(o.c, q.x, q.y, q.r);
+        ctx.lineWidth = Math.max(0.2, Math.min(p.lw, q.r * 0.9));
+        ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(0.3, q.r), 0, TAU); ctx.stroke();
+      } else if(p.shape === "brick"){
+        ctx.fillStyle = paintOf(o.c, q.x, q.y, q.r);
+        ctx.fillRect(q.x - q.r, q.y - q.r * 0.6, q.r * 2, q.r * 1.2);
+      } else {
+        ctx.fillStyle = o.c.c1;
+        /* letter-shape's perf lesson: a per-mark `font` assignment is the
+           expensive part of an ASCII pass, not the fillText. Quantise the
+           size so the write happens a handful of times, not once per mark. */
+        var fs = Math.max(2, Math.round(q.r * 2.6));
+        if(fs !== lastAsciiPx){
+          ctx.font = "600 " + fs + "px ui-monospace, SFMono-Regular, Menlo, monospace";
+          lastAsciiPx = fs;
+        }
+        ctx.fillText(o.g, q.x, q.y);
+      }
+    }
+    ctx.lineCap = "butt";
+    resetAlpha();
+  },
+
+  /* real geometry, not an embedded raster — and it does not care which
+     sampler produced the points, so letterforms get SVG for free */
+  toSVG: function(S, p, L, t){
+    var g = new GradPool(), body = [];
+    var sweep = p.sweep * Math.PI / 180;
+    for(var i = 0; i < L.pool.length; i++){
+      var o = L.pool[i], q = MODES.marks.place(S, p, L, t, i);
+      var op = o.a < 1 ? ' opacity="' + n2(o.a) + '"' : "";
+      if(p.shape === "dot" || p.shape === "sphere"){
+        body.push('<circle cx="' + n2(q.x) + '" cy="' + n2(q.y) + '" r="' + n2(q.r) +
+          '" fill="' + g.ref(o.c) + '"' + op + "/>");
+      } else if(p.shape === "brick"){
+        body.push('<rect x="' + n2(q.x - q.r) + '" y="' + n2(q.y - q.r * 0.6) +
+          '" width="' + n2(q.r * 2) + '" height="' + n2(q.r * 1.2) +
+          '" fill="' + g.ref(o.c) + '"' + op + "/>");
+      } else if(p.shape === "ring"){
+        body.push('<circle cx="' + n2(q.x) + '" cy="' + n2(q.y) + '" r="' + n2(Math.max(0.3, q.r)) +
+          '" fill="none" stroke="' + g.ref(o.c) + '" stroke-width="' +
+          n2(Math.max(0.2, Math.min(p.lw, q.r * 0.9))) + '"' + op + "/>");
+      } else if(p.shape === "arc"){
+        var R = Math.max(0.5, q.R);
+        var a0 = q.ang - sweep / 2, a1 = q.ang + sweep / 2;
+        var x0 = L.cx + R * Math.cos(a0), y0 = L.cy + R * Math.sin(a0);
+        var x1 = L.cx + R * Math.cos(a1), y1 = L.cy + R * Math.sin(a1);
+        body.push('<path d="M' + n2(x0) + ' ' + n2(y0) + 'A' + n2(R) + ' ' + n2(R) +
+          ' 0 ' + (sweep > Math.PI ? 1 : 0) + ' 1 ' + n2(x1) + ' ' + n2(y1) +
+          '" fill="none" stroke="' + g.ref(o.c) + '" stroke-width="' +
+          n2(Math.max(0.2, p.lw * (q.r / Math.max(0.15, o.sz)))) +
+          '" stroke-linecap="round"' + op + "/>");
+      } else {
+        body.push('<text x="' + n2(q.x) + '" y="' + n2(q.y) +
+          '" font-family="ui-monospace, monospace" font-weight="600" font-size="' +
+          n2(q.r * 2.6) + '" text-anchor="middle" dominant-baseline="central" fill="' +
+          o.c.c1 + '"' + op + ">" + o.g.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</text>");
+      }
+    }
+    return svgDoc(S, g.defs.join(""), body.join(""));
+  }
+};
+MODE_ORDER.push("marks");
+
+/* ============================================================
    MODE — DOTS Dot matrix
    ============================================================ */
 MODES.dots = {

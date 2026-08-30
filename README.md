@@ -8,12 +8,13 @@
 
 按 RedSkill 的 `generative-tool-bycoraldesign` 规范实现（`02_agent_memory_and_skills/generative-tool-bycoraldesign/视觉生成器SKILL/SKILL.md`）。对该规范的偏离逐条记在 `PRODUCT.md`，**不要去改 SKILL.md**。
 
-## 七个模式
+## 八个模式
 
-topbar 右侧切换。每个模式有自己的参数分组，下面接四组公共参数。
+面板顶部 Style 一行切换。每个模式有自己的参数分组，下面接四组公共参数。
 
 | tab | 中文 | 画的是什么 | SVG |
 |---|---|---|---|
+| `MARKS` | 点标记 | **合并引擎**：4 个分布（网格 / 同心环 / 轨道 / 字形）× 6 个 mark 形状（点 / 弧 / 球 / 砖 / ASCII / 圆环），**任意两个分布之间可 morph** | ✓ |
 | `DOTS` | 点阵 | 网格点阵，可错位、抖动、中心衰减，正弦 / 径向形变 | ✓ |
 | `ARCS` | 弧形 | 同心圆上的弧段，逐层旋转，可控张角与角度抖动 | ✓ |
 | `ORBS` | 圆环 | 倾斜轨道上的球，带光晕、深度缩放、轨道线 | ✓ |
@@ -23,6 +24,31 @@ topbar 右侧切换。每个模式有自己的参数分组，下面接四组公�
 | `FLOW` | 粒子流场 | 粒子沿噪声流场积分出的流线，带末端收细 | ✓ |
 
 AURA 和 SLICE 是真栅格效果，SVG 按钮会禁用并在 title 里写明原因。
+
+### MARKS 是什么
+
+它是 `UNIFICATION.md` 里那个合并的第一步：把 DOTS、ARCS、ORBS 和
+`letter-shape-generator` **整个工具**收进一个模式。做法是把模式契约再切细一道，
+按 letter 的切法：
+
+```
+pool          一个 mark 是什么   颜色 / 大小 / 透明度 / 相位 / 字符。有种子，
+                                 且完全不知道自己会被放到哪里
+sample(dist)  它去哪            grid · rings · orbit · glyph，四个采样器共用一个 pool
+place(t)      逐帧              形变、颤动、呼吸。只推进相位，绝不重新随机布局
+draw(shape)   画成什么          dot · arc · sphere · brick · ascii · ring，独立的一个轴
+```
+
+**把 pool 和 sample 分开，是这件事的全部意义**：mark 的身份与它的位置无关，
+所以可以对同一个 pool 跑两个采样器再插值。那就是 `Morph`——点阵重组成一个词、
+弧环散成字形。cream 和 letter 现在都表达不了这个。
+
+同理，**mark 形状是独立的轴**，所以「网格画成弧」「字形画成球体」都成立。
+
+FIELD / FLOW（折线）和 AURA / SLICE（栅格）**不进** MARKS：它们返回的不是点标记，
+是别的图元，保留各自的 `build / place / draw / toSVG`。
+
+DOTS / ARCS / ORBS 暂时原样保留。等 MARKS 证明覆盖得住它们三个，再退役那三个 tab。
 
 ## 用法
 
