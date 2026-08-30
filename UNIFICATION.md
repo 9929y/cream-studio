@@ -70,17 +70,55 @@ source ──► glass₁ ──► glass₂ ──► … ──► glassₙ �
 | 阶段 | cream-studio | letter-shape-generator |
 |---|---|---|
 | **pool**<br>一个 mark *是什么* | 混在 `build(S,p)` 里，决定位置的同时决定 `c` / `r` / `a` / `ph` | `shapes[]` 独立构建（index.html:1183）：`color`（`weightedPick`）、`size`、`opacity`、`trembleFreq`、`tremblePhase`、`breathPhase`、`glyph`、`bricks`。**完全不依赖文字。** |
-| **distribution**<br>它*去哪* | 七个 mode 各返回一个点列表（DOTS / ARCS / ORBS / FIELD / AURA / SLICE / FLOW） | 只有一个：`assignTargets(text)`（index.html:1218）——采样字形 mask，往**已经存在的** mark 上写 `toX` / `toY` |
+| **distribution**<br>它*去哪* | 点类模式各返回一个点列表（见下表：只有 DOTS / ARCS / ORBS 是点类） | 只有一个：`assignTargets(text)`（index.html:1218）——采样字形 mask，往**已经存在的** mark 上写 `toX` / `toY` |
 | **place(t)**<br>逐帧 | `MODES.dots.place()`，注释原话：<br>*"motion advances warp phase + breathing; it never re-randomises layout"* | tremble / breathe，改同样的字段，做同样的事 |
 | **draw**<br>画什么形状 | 形状焊死在 mode 里（DOTS 画圆、ARCS 画弧） | 是个控件：`dot` / `brick` / `ascii` |
 
 **pool 和 distribution 分开**，是 letter 能在多段文字之间炸开重组的原因，也是这次合并的全部价值来源。
 
+### 但只有三个模式能进这个契约（2026-08-30 逐个读过 build 之后修正）
+
+「cream 的七个模式都变成 sampler」是**错的**。七个 `build()` 返回的是**不同的图元**：
+
+| mode | `build()` 返回 | 图元 | 能进点标记契约？ |
+|---|---|---|---|
+| **DOTS** | `{pts:[{x,y,r,a,c,ph,nd,band}]}` | 点 | **能** |
+| **ORBS** | `{orbs:[{R,ring,a,r,al,c,ph}]}` | 极坐标点（`place()` 已经吐 `{x,y,r}`） | **能** |
+| **ARCS** | `{arcs:[{R,a,sweep,layer,lw,c,ph}]}` | 极坐标点 + 角度跨度 | **能**（见下） |
+| FIELD | marching squares 等高线 | 折线 | 不能 |
+| FLOW | `{perm, seeds}` + `trace()` | 折线 | 不能 |
+| AURA | `{blobs}` | 径向渐变栅格 | 不能 |
+| SLICE | `{src, slices}` | 图像切片栅格 | 不能 |
+
+**能进的那三个，per-mark 身份字段是同一套**：`c`（`pickColor()`）、`ph`（相位）、
+一个尺寸（`r` / `lw`）、一个 alpha、一个 ring/layer 索引（喂 `speedDiff`）。
+这正好就是 letter 的 `shapes[]`：`color` / `size` / `opacity` / `tremblePhase` / `breathPhase`。
+
+**ARCS 的 `sweep` 是 draw 参数不是 distribution 参数**——弧就是「一个点加一段角度跨度」。
+所以 ARCS 不是一个分布，它是一个**mark 形状**（描边弧），它的分布是「同心环」。
+同理 ORBS 的 `tilt` / `depth` 属于「轨道」这个分布，它的球体加光晕是一个 mark 形状。
+
+### 所以合并后的形状
+
+**一个点标记模式**，取代 DOTS + ARCS + ORBS + letter-shape **整个工具**：
+
+- **分布 4 个**：`grid`（来自 DOTS）· `rings`（ARCS）· `orbit`（ORBS）· `glyph`（letter）
+  ——**任意两个之间可以 morph**
+- **mark 形状 6 个**：`dot` · `arc` · `sphere` · `brick` · `ascii` · `ring`
+  ——**独立的一个轴**，所以点阵可以用 ASCII 画、字形可以用描边弧画
+
+**四个模式保留自己的图元**：FIELD · FLOW · AURA · SLICE。
+它们继续用 cream 现有的 `build / place / draw / toSVG` 契约——那个契约对它们是对的。
+
+净结果：cream 七个模式 + letter 一个工具 → **五个模式**（1 个点标记 + 4 个图元专用），
+而那个点标记模式比它取代的三个加起来表达力强得多。
+
 ### 合并之后白拿的三样
 
-1. **任意两个分布之间可以 morph。**
+1. **任意两个点分布之间可以 morph。**
    letter 的炸开重组本质就是重跑 sampler 再 tween `from → to`。sampler 一旦可插拔，
-   `grid → glyph`、`rings → glyph`、`flow → grid` 全都成立。**两个 repo 现在都做不到。**
+   `grid → glyph`、`rings → glyph`、`orbit → grid` 全都成立。**两个 repo 现在都做不到。**
+   （只在点标记模式内部成立。FIELD / FLOW / AURA / SLICE 是别的图元，不参与。）
 2. **分布 × mark 形状变成两个独立的轴。**
    cream 的点阵可以用 ASCII 画，letter 的字形可以用圆环画。现在两边都表达不了。
 3. **字形拿到 SVG 导出。**
@@ -140,7 +178,8 @@ Layers / Point / Color / Animation 是 per-layer，Effects / Pattern / Backdrop 
 是全局，UI 上没有任何东西说明。
 
 **规则 2 — 每个 Subject 都以 Kind picker 开头。**
-Glass 18 shapes、Marks 8 distributions、Field 2 topologies——这是同一个控件的三个名字。
+Glass 18 shapes、Marks 5 modes（点标记模式内部再有 4 个分布）、Field 2 topologies——
+这是同一个控件的三个名字。
 做成字面上同一个组件。这条同时保证 **cream 的七个模式不升到顶层**：它们是 Marks 的 Kind，
 和 Glass 的 18 个 shape 同级。
 
@@ -165,7 +204,7 @@ not a mesh you sculpt."* cream 和 letter 站 glass 那边。
 | | 做什么 | 为什么是这个顺序 |
 |---|---|---|
 | **Phase 0** | 抽 `packages/ui` | `Slider` `Section` `Segmented` `Switch` `GlassPanel` `ColorField` `Kbd` 在 meshy 和 glass 里**逐字节相同**，`Button` 差 5 行。零风险、可回退。Glass 虽然独立，也用这套壳。 |
-| **Phase 1** | **cream + letter → 一个 Marks 引擎** | **先做这个，不碰 Mesh。** 两个都是零依赖 canvas 2D，这一阶段还能以单文件交付，双击就跑的属性保得住。而且它单独就交付了上面「白拿的三样 + 互补的两样」。 |
+| **Phase 1** | **cream + letter → 一个 Marks 引擎**：DOTS / ARCS / ORBS 和 letter 整个工具合成**一个点标记模式**（4 分布 × 6 形状 + morph）；FIELD / FLOW / AURA / SLICE 原样保留 | **先做这个，不碰 Mesh。** 两个都是零依赖 canvas 2D，这一阶段还能以单文件交付，双击就跑的属性保得住。而且它单独就交付了上面「白拿的三样 + 互补的两样」。 |
 | **Phase 2** | Studio：Field + Marks 进同一个文档 | 两个决定扛这一阶段：`renderAt(t) → HTMLCanvasElement` 边界（让 WebGL 层合成进 2D 栈，同时让图片/视频/GIF 导出只写一次），和 mesh 节点改色板槽位。**单文件属性在这里花掉。** |
 | **Phase 3** | Studio ↔ Glass 交接 | `studio-doc` source kind + Open in Glass。顺带统一导出编码器，见下。 |
 
@@ -192,7 +231,7 @@ studio/
 ├── packages/core          文档信封 · transport · history · seeded rng · renderAt() · GIF + MP4
 ├── packages/finish        那 22 个字段的后期链，WebGL pass + 2D pass
 ├── packages/engine-field   ← meshy-studio                      · WebGL
-├── packages/engine-marks   ← cream-studio + letter-shape       · 2D · 8 distributions
+├── packages/engine-marks   ← cream-studio + letter-shape       · 2D · 5 modes
 └── packages/engine-glass   ← glass-studio                      · WebGL · chain
 ```
 
