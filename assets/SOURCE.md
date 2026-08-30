@@ -17,3 +17,6 @@ sips -Z 900 --setProperty formatOptions 62 <新图> --out bg900.jpg
 ⚠️ 换图后要重新验对比度。`index.html` 的 `--scrim` 是按这张图**最亮处 153** 反推出来的
 （scrim 0.45 + 玻璃 0.14 → 白字 9.09:1、`--ink-2` 5.87:1、`--ink-3` 4.85:1）。
 换一张更亮的图，scrim 要跟着加大，否则参数数值会看不清。
+
+⚠️ 2026-08-27 起，桌面上的原件 `~/Desktop/Cover.jpg` 已经不在了。
+**这一份是那张原图仅存的副本**，也随 `9929y/cream-studio` 一起推上了 GitHub。删之前先想清楚。
