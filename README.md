@@ -1,101 +1,62 @@
 # Cream Studio
 
-离线 HTML 生成艺术工作台。**一个仪器盘外壳装七个生成器**，共用同一套种子、运动、音频响应和导出管线。
+Cream Studio is a single-file generative art workbench: seven visual generators in one quiet control surface, sharing the same seed, motion system, audio response, palette model, and export pipeline.
 
-**零依赖、零外部请求、离线可用。** 双击 `index.html` 就能跑，不需要构建、不需要服务器、不联网。`yy-studio.css` 是同目录的 Pearl Flowglass 共享 token；字体走系统回退，背景图以 data URI 内联在文件里。
+It is designed for fast visual exploration. Open one file, tune a piece, export the result, and move on.
 
-界面用 **Apple visionOS** 设计语言：浅色玻璃、大圆角、胶囊控件。所有 token 是从 Yanice 给的 Figma 文件里读出来的，不是凭印象写的 —— 详见 `PRODUCT.md` 第 10 与 14 条。⚠️ visionOS UI Kit 本身**没有深色文字的浅色模式**（它的 light/dark 变体只换玻璃色调、文字都是白的），所以这里深色文字那一整套是解出来的，不是照抄。
+## What it makes
 
-按 RedSkill 的 `generative-tool-bycoraldesign` 规范实现（`02_agent_memory_and_skills/generative-tool-bycoraldesign/视觉生成器SKILL/SKILL.md`）。对该规范的偏离逐条记在 `PRODUCT.md`，**不要去改 SKILL.md**。
-
-## 七个模式
-
-topbar 右侧切换。每个模式有自己的参数分组，下面接四组公共参数。
-
-| tab | 中文 | 画的是什么 | SVG |
-|---|---|---|---|
-| `DOTS` | 点阵 | 网格点阵，可错位、抖动、中心衰减，正弦 / 径向形变 | ✓ |
-| `ARCS` | 弧形 | 同心圆上的弧段，逐层旋转，可控张角与角度抖动 | ✓ |
-| `ORBS` | 圆环 | 倾斜轨道上的球，带光晕、深度缩放、轨道线 | ✓ |
-| `FIELD` | 等高线地形 | fBm 噪声场跑 marching squares，可叠色阶填充 | ✓ |
-| `AURA` | 扩散渐变 | 径向渐变晕染叠加，三种分布 + 三种混色模式 | 栅格 |
-| `SLICE` | 图像切碎 | 把图片横 / 竖 / 双向切片错位，可留缝隙 | 栅格 |
-| `FLOW` | 粒子流场 | 粒子沿噪声流场积分出的流线，带末端收细 | ✓ |
-
-AURA 和 SLICE 是真栅格效果，SVG 按钮会禁用并在 title 里写明原因。
-
-## 用法
-
-界面语言是**英文**，**只有浅色模式**。布局是两栏，直接压在背景图上：
-
-- **左边** —— 预览。画布底下没有玻璃盒子，只有它自己的投影
-- **右边** —— 一块浮起的玻璃面板，所有东西都在这里：品牌、麦克风、Style、Presets、Palette、Fill、参数、Motion、More、Settings、Randomize / Export 和状态行
-
-**面板左边缘可以拖拽改宽**（300–460px，宽度会记住，双击把手回到 360）。窄屏时面板变成底部抽屉。
-
-**Style** 和 **Presets** 都是单行横向滚动条。Style 一次显示四个（窄屏三个），第五个露出一小截作为可滑动的提示。
-
-**每个模式第一次打开时会自动套用它的招牌预设**，所以打开就是一张成品；之后再回到那个模式，你自己调过的参数会保留。
-
-- **Palette** —— 六套命名主题加一排圆色块。点色块改色值 / 权重 / 删除。**预设不会改配色**，配色始终是你选的那一套
-- **Fill** —— `Solid` / `Gradient` 是**整套色板级别**的开关，不是逐个颜色设置。选 Gradient 后旁边出现 Depth，控制渐变末端离本色多远
-- **Seed** 在 Settings 里 —— 它是复现用的，不是创作用的
-
-### 快捷键
-
-| 操作 | 键 |
-|---|---|
-| 播放 / 暂停 | `Space` |
-| 步进 seed（焦点在 Settings 里的 Seed 框上） | `↑` `↓` |
-| 关闭弹层 | `Esc` |
-
-### 三处反馈各管一件事
-
-避免同一个数字在三个地方重复：
-
-- **画布四周什么都没有。** seed、运动档、尺寸都在面板里有对应控件，围着作品再标一遍是三重冗余
-- **面板底部的状态行** —— 唯一的瞬时通道：接了麦克风是三频段实时百分比，刚导出是文件名，否则是一条随模式变化的操作提示
-
-### 音频响应
-
-面板右上角的麦克风图标按钮接麦克风（图标是 visionOS UI Kit 自己的 `mic.fill`，从 Figma 导出后内联）。接通后自动起动画，旁边三条 VU 条实时跳动，状态行显示三频段百分比。
-
-| 频段 | 范围 | 驱动 |
+| Mode | Output | Export |
 |---|---|---|
-| Bass | 20–200 Hz | 元素尺寸 / 波幅 |
-| Mid | 200–2500 Hz | 旋转 / 流速 |
-| Hi | 2500–8000 Hz | 位置抖动 |
+| `DOTS` | grid-based dot fields with offset, jitter, falloff, and wave/radial deformation | SVG |
+| `ARCS` | concentric arc systems with rotation, spread, and angular jitter | SVG |
+| `ORBS` | orbiting spheres with depth, glow, and track lines | SVG |
+| `FIELD` | contour terrain built from fBm noise and marching squares | SVG |
+| `AURA` | layered radial gradient fields with distribution and blend controls | raster |
+| `SLICE` | image-slice compositions with directional offsets and gaps | raster |
+| `FLOW` | noise-field streamlines with tapered trails | SVG |
 
-`灵敏度` 是三路共用的倍率，`平滑度` 是 EMA 系数（越大越黏，越不容易抖）。
+`AURA` and `SLICE` are raster-native effects, so SVG export is disabled for those modes.
 
-## 导出
+## Using it
 
-底部选格式再按 Export。三种格式**都走 data URI**，并且导完会在按钮下方留一条可见的「右键另存为」链接 —— 因为 `link.click()` 在部分沙箱里会被拦掉。
+Open `index.html`.
 
-**导出只生成，不会自作主张下载。** 点 `Export` 生成文件，按钮变成 `↓ 下载 xxx.png`，**再点一次**才真的保存。期间改任何参数、换模式、换格式，暂存都会作废、按钮变回 `Export`。（早期版本会在生成后自动触发下载，导致 Chrome 反复弹「此站点想要下载多个文件」，已修。）
+There is no build step, server, account, or network dependency. The tool runs offline and keeps the current document in the browser between visits.
 
-- **PNG** —— 当前帧，画布原尺寸
-- **SVG** —— 真几何序列化（`<circle>` / `<path>` / `<ellipse>`），不是嵌图。渐变色条会生成对应的 `radialGradient` / `linearGradient` def。FLOW 导出的是流线 `<path>`，可以直接进绘图仪或后期编辑
-- **GIF** —— 最长边 480px、14fps、42 帧走完一个完整 2π 相位循环，NETSCAPE2.0 无限循环。导出期间画布上有进度浮层，动画暂停，结束恢复
+The interface has two areas:
 
-GIF 用的是**内联手写的 GIF89a 编码器，没有外部库**（首帧 RGB555 桶采样取 256 色全局调色板，后续帧走 32768 项最近邻查表；标准 LZW 带位宽增长与字典重置）。移植自同目录的 `letter-shape-generator`。
+- Canvas on the left: the artwork stays visually dominant.
+- Inspector on the right: presets, palette, fill, mode parameters, motion, audio, export, and settings.
 
-## 实现要点
+The inspector can be resized on desktop and becomes a bottom drawer on narrow screens.
 
-- **确定性** —— 所有结构性随机都来自一个 LCG seeded RNG（`rng = rng*16807 % 2147483647`）。`Math.random()` 全文件只出现在三处：Reseed / Randomize 按钮、「加一个随机颜色」按钮、音频的逐帧抖动。七个模式都验过：改 seed 出图变，改回去逐字节复原
-- **模式接口** —— `MODES[name] = { label, cn, unit, defaults, groups, looks, build, draw, toSVG?, count }`。外壳只认这个契约，参数面板由 `groups` 里的声明式 spec 自动生成。加第八个模式不用动外壳
-- **布局缓存** —— 参数标了 `struct:true` 的会让缓存失效并重建布局，其余只重绘。运动在缓存基座上叠相位
-- **界面** —— visionOS 玻璃：`backdrop-blur(50px)` 的窗口浮在背景图上，控件全是胶囊，滑杆是 14px 的凹槽胶囊**没有滑块**（指针悬停或键盘聚焦时才浮出白点）
-- **一个强调色** `#c7d3db` —— 从背景图自己的青蓝 `#6c8ca0` 提亮 62% 取得，承担两个主题里全部的激活态与主按钮。浅色模式下淡色填充对面板只有 1.14:1，所以激活态靠 1.5px 的 `#4e697a` 描边界定（4.35:1），不是靠填充
-- **对比度是解出来的** —— 玻璃能用回规范里的 `rgba(0,0,0,.14)`，靠的是 visionOS 自己那招：把窗口后面的环境压暗。`--scrim` 的 0.45 是按背景图实测最亮处 153 反解的。**换背景图必须重算**，见 `assets/SOURCE.md`
-- **性能** —— 全部 7 个模式 × 35 套预设实测，最慢的一套（FIELD / Marble，6 万段等高线）单次 build+draw 11.3ms，在 60fps 的 16.7ms 预算内。FLOW 的末端收细原本是每段一次 `stroke()`（长拖尾预设下接近 10 万次），改成按 taper 分 6 段等宽批量描边后从 22.7ms 降到 10ms 以内
-- **后台标签页** —— `rAF` 在隐藏标签页会暂停，所以 `dt` 做了 0.1s 上限、`visibilitychange` 时重置计时；GIF 采集走 `setTimeout` 而不是 `rAF`，切走也不会卡死
+## Export
 
-## 已知边界
+Exports are generated as data URLs. Nothing is downloaded until the user explicitly clicks the generated download action.
 
-- GIF 的一轮循环定义为 `time` 推进 2π。DOTS / ARCS / ORBS 这类三角函数驱动的模式能无缝首尾相接；FIELD / FLOW / AURA / SLICE 因为噪声域随时间平移，首尾不完全衔接
-- SLICE 默认用的是按当前色板程序生成的一张图。要用自己的图：面板里「选择图片」，或者直接把图片拖进画布（拖进去会自动切到 SLICE 模式）。「用生成的默认图」可以换回来
-- 麦克风需要浏览器授权。`file://` 下 Chrome 可以，某些浏览器会拒；被拒时状态行会写明原因，不会静默失败
-- **换背景图要重算 `--scrim`。** 现在的值是按这张图最亮处解出来的，换一张更亮的图，次要文字会先跌破 4.5:1。步骤写在 `assets/SOURCE.md`
-- **SF Pro 靠系统字体解析。** macOS 上是真 SF Pro；非 Apple 系统会回落到 `system-ui`，字形不同但排版尺度不变
-- **浅色模式是推演，不是照抄。** visionOS UI Kit 里根本没有深色文字的浅色模式（它的 light/dark 变体只换玻璃色调、文字都是白的）。浅色主题里只有两个值有出处，其余是按这张背景图解出来的，细节见 `PRODUCT.md` 第 12 条
+| Format | Notes |
+|---|---|
+| PNG | current frame at canvas size |
+| SVG | real vector geometry for vector-native modes |
+| GIF | one full motion loop, global palette, standard LZW encoding |
+
+The GIF encoder is embedded in the file, so export works offline.
+
+## Implementation notes
+
+- Deterministic layout: structural randomness comes from a seeded LCG, so the same seed recreates the same composition.
+- Shared mode contract: each generator declares `groups`, `defaults`, `looks`, `build`, `draw`, optional `toSVG`, and count metadata.
+- Responsive controls: structural parameters rebuild cached geometry; visual parameters redraw immediately.
+- Audio response: bass, mid, and high bands drive size, rotation/flow, and jitter.
+- Accessibility: text contrast is checked across themes, controls are keyboard reachable, focus states are visible, and reduced-motion users get flattened UI transitions.
+
+## Design direction
+
+The control surface uses a restrained glass interface so the canvas can stay loud. The visual system is intentionally neutral: the artwork carries color and motion, while the UI stays quiet, precise, and secondary.
+
+## Lineage
+
+The project was implemented from a generative-art design brief credited to bycoraldesign. The application architecture, seven-mode shell, deterministic control system, offline export behavior, and interaction refinements were built for this implementation.
+
+Keep this note if the source brief or license requires public attribution.
