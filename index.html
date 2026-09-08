@@ -4,42 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Cream Studio</title>
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b0d11">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F6F7F8">
 <style>
 :root{
-  /* ============================================================
-     Light-only. visionOS UI Kit values where the kit has them
-     (slider track rgba(0,0,0,.20) node 4:5492, radii, pill sizes);
-     everything to do with dark type is solved, not copied, because
-     the kit has no dark-text mode. See PRODUCT.md deviations 10-14.
-     ============================================================ */
+  /* Pearl Flowglass: shared shell for Glass, Meshy, and Cream. */
   --blur:var(--yy-glass-blur,50px);
-  --scrim:rgba(255,255,255,.12);      /* lifts the environment a little */
-  --panel:var(--yy-pane,rgba(255,255,255,.72));      /* the one floating glass surface */
-  --card:var(--yy-pane-strong,rgba(255,255,255,.58)); /* raised parameter card          */
-  --track:rgba(0,0,0,.20);
-  --track-fill:rgba(0,0,0,.70);
-  --sunk:rgba(0,0,0,.05);
+  --scrim:rgba(255,255,255,.10);
+  --panel:var(--yy-pane,rgba(250,252,255,.55));
+  --card:var(--yy-pane-strong,rgba(252,253,255,.72));
+  --track:rgba(86,101,116,.12);
+  --track-fill:rgba(94,111,130,.42);
+  --sunk:rgba(86,101,116,.08);
 
-  --accent:var(--yy-slot,#c7d3db);
+  --accent:rgba(255,255,255,.74);
   --on-accent:var(--yy-ink,#1d1d1f);
-  --active-ring:var(--yy-ink,#4e697a);
+  --active-ring:var(--yy-glass-border,rgba(86,101,116,.18));
 
   --ink:var(--yy-ink,#1d1d1f); --ink-2:var(--yy-ink-muted,#46464b); --ink-3:var(--yy-ink-quiet,#58585f);
-  --btn-bg:rgba(0,0,0,.06); --btn-ink:#1d1d1f;
-  --hairline:var(--yy-glass-border,rgba(0,0,0,.09));
-  --hover:rgba(0,0,0,.06); --hover-strong:rgba(0,0,0,.10);
-  --sw-ring:rgba(0,0,0,.18);
-  --scroll-thumb:rgba(0,0,0,.16);
-  --dot-off:rgba(0,0,0,.16);
+  --btn-bg:rgba(255,255,255,.42); --btn-ink:var(--yy-ink,#1d1d1f);
+  --hairline:var(--yy-glass-border,rgba(86,101,116,.18));
+  --hover:rgba(255,255,255,.38); --hover-strong:rgba(255,255,255,.66);
+  --sw-ring:rgba(86,101,116,.28);
+  --scroll-thumb:rgba(86,101,116,.22);
+  --dot-off:rgba(86,101,116,.24);
 
-  --edge:inset 0 1px 1px rgba(255,255,255,.90), inset 0 -1px 1px rgba(0,0,0,.05);
-  --edge-track:inset 0 1px 2px rgba(0,0,0,.10);
-  --edge-recess:inset 0 1px 2px rgba(0,0,0,.08);
-  --drop-panel:0 30px 70px rgba(38,42,58,.22), 0 6px 16px rgba(38,42,58,.10);
-  --canvas-shadow:0 2px 8px rgba(38,42,58,.12), 0 28px 64px rgba(38,42,58,.28);
-  --pop-bg:rgba(250,250,252,.94);
+  --edge:inset 0 1px 1px rgba(255,255,255,.94), inset 0 -1px 1px rgba(86,101,116,.06);
+  --edge-track:inset 0 1px 2px rgba(86,101,116,.10);
+  --edge-recess:inset 0 1px 2px rgba(86,101,116,.08);
+  --drop-panel:0 24px 64px rgba(64,79,97,.14), 0 8px 22px rgba(64,79,97,.08);
+  --canvas-shadow:0 14px 42px rgba(64,79,97,.10), inset 0 1px 0 rgba(255,255,255,.90);
+  --pop-bg:rgba(252,253,255,.84);
 
   --r-32:32px; --r-24:24px; --r-22:22px; --r-20:20px;
   --r-18:18px; --r-14:14px; --r-12:12px; --r-10:10px; --r-pill:100px;
@@ -58,7 +53,10 @@ body{
   font:400 14px/1.45 var(--sf);
   font-variant-numeric:tabular-nums;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
-  background:#c9cfd8 var(--bg-img) center/cover no-repeat fixed;
+  background:
+    radial-gradient(900px 620px at 6% 94%,rgba(255,255,255,.92),transparent 62%),
+    radial-gradient(760px 560px at 96% 13%,rgba(224,233,242,.72),transparent 64%),
+    var(--yy-ground,#F6F7F8);
   overflow:hidden;
   display:grid;
   grid-template-columns:minmax(0,1fr) var(--pw);
@@ -96,6 +94,8 @@ button,input,select{font-family:inherit}
   background:var(--panel);
   backdrop-filter:blur(var(--blur)) saturate(150%);
   -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+  border:1px solid var(--hairline);
+  border-top-color:var(--yy-glass-edge,rgba(255,255,255,.96));
   box-shadow:var(--drop-panel),var(--edge);
   display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }
@@ -109,7 +109,7 @@ button,input,select{font-family:inherit}
 body.resizing{cursor:col-resize;user-select:none}
 
 .panel-head{
-  flex:none;display:flex;align-items:center;gap:12px;
+  flex:none;display:flex;align-items:center;justify-content:flex-end;gap:12px;
   padding:18px 20px 12px;
 }
 .brand{font-size:15px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
@@ -127,7 +127,7 @@ body.resizing{cursor:col-resize;user-select:none}
 .micb:hover{background:var(--hover-strong);color:var(--ink)}
 .micb.on{background:var(--accent);color:var(--on-accent);box-shadow:inset 0 0 0 1.5px var(--active-ring)}
 .live{width:6px;height:6px;border-radius:50%;background:var(--dot-off);flex:none;transition:background var(--dur) var(--ease)}
-.live.on{background:var(--ink);animation:pulse 1.4s ease-in-out infinite}
+.live.on{background:rgba(94,111,130,.70);animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 .vus{display:flex;align-items:flex-end;gap:3px;height:15px;flex:none}
 .vu{width:4px;height:15px;background:var(--track);border-radius:var(--r-pill);position:relative;overflow:hidden}
@@ -227,7 +227,7 @@ input[type=range]::-webkit-slider-runnable-track{
 /* the kit's slider has no thumb; a pointer UI still needs a grab cue,
    so the knob only appears on hover / keyboard focus */
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:transparent;border:0;transition:background var(--dur) var(--ease)}
-input[type=range]:hover::-webkit-slider-thumb,input[type=range]:focus-visible::-webkit-slider-thumb{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+input[type=range]:hover::-webkit-slider-thumb,input[type=range]:focus-visible::-webkit-slider-thumb{background:#fff;box-shadow:0 1px 5px rgba(64,79,97,.22),inset 0 0 0 1px rgba(86,101,116,.22)}
 input[type=range]::-moz-range-track{height:14px;border-radius:var(--r-22);background:var(--track);box-shadow:var(--edge-track)}
 input[type=range]::-moz-range-progress{height:14px;border-radius:var(--r-22);background:var(--track-fill)}
 input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:transparent;border:0}
@@ -307,7 +307,7 @@ input[type=range]:hover::-moz-range-thumb,input[type=range]:focus-visible::-moz-
   .panel{margin:0;border-radius:var(--r-32) var(--r-32) 0 0}
   .rhandle{display:none}
   .grip{display:flex;gap:14px;align-items:center;justify-content:center;padding:10px 0 0;opacity:.28;flex:none}
-  .grip i{display:block;height:11px;border-radius:var(--r-10);background:var(--ink)}
+  .grip i{display:block;height:11px;border-radius:var(--r-10);background:rgba(94,111,130,.52)}
   .grip i:first-child{width:11px}
   .grip i:last-child{width:126px}
   #modeTabs{width:calc(3 * 70px + 3 * 4px + 14px)}
@@ -322,7 +322,7 @@ input[type=range]:hover::-moz-range-thumb,input[type=range]:focus-visible::-moz-
 <body>
   <main class="stage">
     <div class="cwrap">
-      <canvas id="cv" width="1000" height="1000"></canvas>
+      <canvas id="cv" width="1000" height="1000" role="img" aria-label="Live generated pattern preview"></canvas>
       <div class="prog" id="prog" role="status" aria-live="polite">
         <span id="progTxt">GIF 0%</span>
         <span class="progtrack"><i id="progBar"></i></span>
@@ -335,8 +335,6 @@ input[type=range]:hover::-moz-range-thumb,input[type=range]:focus-visible::-moz-
     <div class="grip" aria-hidden="true"><i></i><i></i></div>
 
     <div class="panel-head">
-      <span class="brand">CREAM STUDIO</span>
-      <span class="tb-spacer"></span>
       <div class="au">
         <button class="micb" id="micBtn" type="button" aria-pressed="false" aria-label="Audio input">
           <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 9.1183C9.01953 9.1183 9.77288 8.35491 9.77288 7.23996V3.85491C9.77288 2.73996 9.01953 1.97656 8 1.97656C6.98047 1.97656 6.22712 2.73996 6.22712 3.85491V7.23996C6.22712 8.35491 6.98047 9.1183 8 9.1183ZM4.16295 7.35547C4.16295 9.43471 5.54408 10.856 7.53292 11.0469V12.0664H5.68973C5.42355 12.0664 5.20257 12.2773 5.20257 12.5435C5.20257 12.8047 5.42355 13.0206 5.68973 13.0206H10.3103C10.5765 13.0206 10.7974 12.8047 10.7974 12.5435C10.7974 12.2773 10.5765 12.0664 10.3103 12.0664H8.46708V11.0469C10.4559 10.856 11.8371 9.43471 11.8371 7.35547V6.36607C11.8371 6.09989 11.6261 5.89397 11.3599 5.89397C11.0938 5.89397 10.8728 6.09989 10.8728 6.36607V7.32031C10.8728 9.03292 9.71261 10.1579 8 10.1579C6.28739 10.1579 5.12723 9.03292 5.12723 7.32031V6.36607C5.12723 6.09989 4.91127 5.89397 4.64509 5.89397C4.37891 5.89397 4.16295 6.09989 4.16295 6.36607V7.35547Z"/></svg>
@@ -615,13 +613,15 @@ function mkSeg(host, p, store){
     var b = el("button",null,o[1]);
     b.type = "button"; b.dataset.val = String(o[0]);
     if(String(store[p.k]) === String(o[0])) b.className = "active";
+    b.setAttribute("aria-pressed", String(String(store[p.k]) === String(o[0])));
     seg.appendChild(b);
   });
   seg.addEventListener("click", function(e){
     var b = e.target.closest("button[data-val]");
     if(!b) return;
-    Array.prototype.forEach.call(seg.children, function(c){ c.className = ""; });
+    Array.prototype.forEach.call(seg.children, function(c){ c.className = ""; c.setAttribute("aria-pressed", "false"); });
     b.className = "active";
+    b.setAttribute("aria-pressed", "true");
     var raw = b.dataset.val, num = parseFloat(raw);
     store[p.k] = (!isNaN(num) && String(num) === raw) ? num : raw;
     if(p.struct) invalidate();
@@ -743,6 +743,7 @@ function renderFill(){
   [["solid","Solid"],["gradient","Gradient"]].forEach(function(o){
     var b = el("button", S.fill === o[0] ? "active" : null, o[1]);
     b.type = "button"; b.dataset.val = o[0];
+    b.setAttribute("aria-pressed", String(S.fill === o[0]));
     seg.appendChild(b);
   });
   seg.addEventListener("click", function(e){
@@ -958,7 +959,11 @@ function settingsGroups(){
   ];
 }
 
-S.speed = 0;
+// The empty state is a working visual sample. Users can stop it, but should
+// never have to imagine what a mode will do before making the first change.
+// Respect a motion-sensitive visitor on first load. Choosing a motion speed is
+// still an explicit opt-in, but the default never starts moving unexpectedly.
+S.speed = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1;
 S.fill = "solid";        /* palette-wide, never per swatch */
 S.depth = 0.28;          /* how far the gradient end sits from the base */
 
@@ -1027,6 +1032,7 @@ function renderLooks(){
   MODES[S.mode].looks.forEach(function(lk, i){
     var b = el("button", currentLook === i ? "active" : null, lk.name);
     b.type = "button";
+    b.setAttribute("aria-pressed", String(currentLook === i));
     b.addEventListener("click", function(){
       applyLook(i); rebuildPanel(); setMotion(); redraw();
     });
@@ -1045,6 +1051,7 @@ function setMode(name){
   }
   Array.prototype.forEach.call($("modeTabs").children, function(b){
     b.className = b.dataset.mode === name ? "active" : "";
+    b.setAttribute("aria-pressed", String(b.dataset.mode === name));
   });
   rebuildPanel();
   redraw();
@@ -1055,6 +1062,7 @@ function buildTabs(){
   MODE_ORDER.forEach(function(name){
     var b = el("button", name === S.mode ? "active" : null, MODES[name].label);
     b.type = "button"; b.dataset.mode = name;
+    b.setAttribute("aria-pressed", String(name === S.mode));
     b.title = MODES[name].cn;
     b.addEventListener("click", function(){ setMode(name); });
     host.appendChild(b);
@@ -1337,7 +1345,9 @@ function wire(){
     rd.readAsDataURL(file);
   });
   document.addEventListener("keydown", function(e){
-    if(e.code === "Space" && !/^(INPUT|TEXTAREA)$/.test(e.target.tagName)){
+    // Space belongs to the focused control. Without this guard, pressing Space
+    // on a preset or Export button also toggled the whole animation.
+    if(e.code === "Space" && !/^(INPUT|TEXTAREA|BUTTON|SELECT|A)$/.test(e.target.tagName) && !e.target.isContentEditable){
       e.preventDefault();
       S.speed = S.speed > 0 ? 0 : 2;
       rebuildPanel(); setMotion();
