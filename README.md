@@ -55,10 +55,6 @@ The GIF encoder is embedded in the file, so export works offline.
 
 The control surface uses a restrained glass interface so the canvas can stay loud. The visual system is intentionally neutral: the artwork carries color and motion, while the UI stays quiet, precise, and secondary.
 
-## Lineage
-
-The project was implemented from a generative-art design brief credited to bycoraldesign. The application architecture, seven-mode shell, deterministic control system, offline export behavior, and interaction refinements were built for this implementation.
-
 ## Licence
 
-MIT — see [LICENSE](LICENSE). The generative-art design brief is credited above.
+MIT — see [LICENSE](LICENSE).
