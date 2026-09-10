@@ -59,4 +59,6 @@ The control surface uses a restrained glass interface so the canvas can stay lou
 
 The project was implemented from a generative-art design brief credited to bycoraldesign. The application architecture, seven-mode shell, deterministic control system, offline export behavior, and interaction refinements were built for this implementation.
 
-Keep this note if the source brief or license requires public attribution.
+## Licence
+
+MIT — see [LICENSE](LICENSE). The generative-art design brief is credited above.
